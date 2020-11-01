@@ -1,3 +1,99 @@
+import wave
+import socket
+import pickle
+import wavio
+import time
+
+from twisted.internet import reactor, protocol
+
+
+class AudioStreamer:
+    def __init__(self, filename, address=None, n_frames=None):
+        self.filename = filename
+        self.wav = wave.open(filename, 'rb')
+        self.params = self.wav.getparams()
+        # Number of frames to send in each transfer.
+        if n_frames is not None:
+            self.n_frames = n_frames
+        else:
+            self.n_frames = 1024
+        if address is not None:
+            self.hostname, self.port = address.split(':')
+            self.port = int(self.port)
+        else:
+            self.hostname = 'localhost'
+            self.port = 6000
+        # Create a socket connection for connecting to the server:
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.hostname, self.port))
+        # Send data
+        self.send_params()
+        time.sleep(0.1)  # Something is not blocking correctly. This sleep fixes it.
+        self.send_data()
+
+    def send_params(self):
+        # Send the params pickled.
+        params_send = pickle.dumps(self.params)
+        self.client_socket.send(params_send)
+
+    def send_data(self):
+        data = self.wav.readframes(self.n_frames)
+        print(len(data))
+        while data != b'':
+            self.client_socket.send(data)
+            data = self.wav.readframes(self.n_frames)
+
+
+if __name__ == '__main__':
+    #filename = 'wav/AnnaBlanton_Rachel_Full/06_Violin.wav'
+    filename = 'wav/Secretariat_Homebound/01_VoxBanjo.wav'
+    #filename = 'wav/Secretariat_Homebound/02_VoxGuitar.wav'
+
+    # Initialize AudioStreamer
+    host = "192.168.1.88:6000"
+    streamer = AudioStreamer(filename, host)
+
+    #host = "62.249.189.110:8000"
+
+    #host = "192.168.1.88"
+    #port = 6000
+    #reactor.connectTCP(host, port, AudiostreamerFactory(filename=filename))
+    #reactor.run()
+
+    # Open the sound file
+    #wf = wave.open(filename, 'rb')
+    #streamer = AudioStreamer(wf, host)
+    #wf.close()
+    #streamer_g = AudioStreamer(host)
+
+    # Send data to the recorder.
+    #streamer.send_socket(wf)
+    #wf.close()
+
+    #wf_g = wave.open(filename_g, 'rb')
+    #print(wf.readframes(5))
+
+    # Figuring out how to mix the data in Audionode.
+    #wav_wavio = wavio.read(filename)
+    #print(wav_wavio)
+    #print(wav_wavio.data[20000:20050])
+    #print(wav_wavio.data[20000:20050, 0])
+    #print(wav_wavio.data[20000:20050, 1])
+    #print(list(zip(*wav_wavio.data[20000:20050]))[0])
+    #print(list(zip(*wav_wavio.data[20000:20050]))[1])
+    #print(max(list(zip(*wav_wavio.data))[0]))
+    #print(min(list(zip(*wav_wavio.data))[1]))
+
+    #streamer_g.send_socket(wf_g)
+
+    #n_frames = 1024
+    #FORMAT = pyaudio.paInt16
+    #CHANNELS = 1
+    #RATE = 44100
+
+    #channels, sampwidth, framerate, nframes, _, _ = wf.getparams()
+    #metadata = (channels, sampwidth, framerate, nframes)
+
 #import pyaudio
 #import wave
 #
@@ -30,92 +126,9 @@
 ## Close and terminate the stream
 #stream.close()
 #p.terminate()
-
-
+#
+#
 #import pyaudio
-import wave
-import socket
-import pickle
-import wavio
-
-from twisted.internet import reactor, protocol
-
-
-class AudioStreamer:
-    def __init__(self, address=None, n_frames=None):
-        self.filename = ''
-        # Number of frames to send in each transfer.
-        if n_frames is not None:
-            self.n_frames = n_frames
-        else:
-            self.n_frames = 1024
-        if address is not None:
-            self.hostname, self.port = address.split(':')
-            self.port = int(self.port)
-        else:
-            self.hostname = 'localhost'
-            self.port = 6000
-        # Create a socket connection for connecting to the server:
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((self.hostname, self.port))
-
-    def send_socket(self, wav):
-        params = wav.getparams()
-        # Send the params pickled.
-        params_send = pickle.dumps(params)
-        self.client_socket.send(params_send)
-        data = wav.readframes(self.n_frames)
-        print(len(data))
-        while data != b'':
-            self.client_socket.send(data)
-            data = wf.readframes(self.n_frames)
-
-
-if __name__ == '__main__':
-    #filename = 'wav/AnnaBlanton_Rachel_Full/06_Violin.wav'
-    filename = 'wav/Secretariat_Homebound/01_VoxBanjo.wav'
-    #filename = 'wav/Secretariat_Homebound/02_VoxGuitar.wav'
-
-    #host = "62.249.189.110:8000"
-
-    host = "192.168.1.88"
-    port = 6000
-    #reactor.connectTCP(host, port, AudiostreamerFactory(filename=filename))
-    #reactor.run()
-
-    # Initialize AudioStreamer
-    host = "192.168.1.88:6000"
-    streamer = AudioStreamer(host)
-    #streamer_g = AudioStreamer(host)
-
-    # Open the sound file
-    wf = wave.open(filename, 'rb')
-    #wf_g = wave.open(filename_g, 'rb')
-    print(wf.readframes(5))
-
-    # Figuring out how to mix the data in Audionode.
-    #wav_wavio = wavio.read(filename)
-    #print(wav_wavio)
-    #print(wav_wavio.data[20000:20050])
-    #print(wav_wavio.data[20000:20050, 0])
-    #print(wav_wavio.data[20000:20050, 1])
-    #print(list(zip(*wav_wavio.data[20000:20050]))[0])
-    #print(list(zip(*wav_wavio.data[20000:20050]))[1])
-    #print(max(list(zip(*wav_wavio.data))[0]))
-    #print(min(list(zip(*wav_wavio.data))[1]))
-
-    # Send data to the recorder.
-    streamer.send_socket(wf)
-    wf.close()
-    #streamer_g.send_socket(wf_g)
-
-    #n_frames = 1024
-    #FORMAT = pyaudio.paInt16
-    #CHANNELS = 1
-    #RATE = 44100
-
-    #channels, sampwidth, framerate, nframes, _, _ = wf.getparams()
-    #metadata = (channels, sampwidth, framerate, nframes)
 #
 #
 #class AudioStream:
@@ -211,4 +224,3 @@ if __name__ == '__main__':
 #        # print data
 
     #client_socket.close()
-

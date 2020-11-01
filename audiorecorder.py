@@ -10,7 +10,6 @@ import time
 
 class AudioRecorder:
     def __init__(self, port=None, n_frames=None):
-        self.filename = ''
         # Number of frames to receive in each transfer.
         if n_frames is not None:
             self.n_frames = n_frames
@@ -64,12 +63,12 @@ class AudioRecorder:
                 data, server = self.client_sockets[self.countConnections].recvfrom(audioChunkSize)
                 packetCount += 1
                 #print('received data length: ', len(data), packetCount)
-                with threading.Lock():
-                    self.audiobuffer.append(data)
+                #with threading.Lock():
+                self.audiobuffer.append(data)
             except OSError as e:
-                print('UH OH')
+                print(e.strerror)
                 break
-        print(self.client_socket)
+        #print(self.client_socket)
         print(len(self.audiobuffer))
         self.client_sockets[self.countConnections].close()
 
