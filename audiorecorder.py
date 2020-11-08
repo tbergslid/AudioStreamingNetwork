@@ -1,7 +1,10 @@
+# A module for receiving, playing, and saving .wav files.
+# Usage: python audiorecorder.py port
+
+import sys
 import pyaudio
 import wave
 import socket
-import threading
 import pickle
 import time
 
@@ -13,7 +16,7 @@ class AudioRecorder:
             self.n_frames = n_frames
         else:
             self.n_frames = 1024
-        self.audiobuffer = []
+        self.audiobuffer = b''
         self.p = pyaudio.PyAudio()
         self.client_sockets = []
         self.address = []
@@ -25,8 +28,10 @@ class AudioRecorder:
             self.port = port
         else:
             self.port = 6000
+        # Setup the listening socket.
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(('', self.port))
+        # Only receive one connection at a time.
         self.server_socket.listen(1)
         print("Your IP address is: ", socket.gethostbyname(socket.gethostname()))
         print("Server waiting for client on port ", self.port)
@@ -38,53 +43,53 @@ class AudioRecorder:
         self.countConnections += 1
 
     def receive_params(self):
-        self.params, server = self.client_sockets[self.countConnections].recvfrom(256)
+        params = self.client_sockets[self.countConnections].recv(128)
         # Convert the parameters back to a tuple.
-        self.params = pickle.loads(self.params)
+        self.params = pickle.loads(params)
         print(self.params)
 
     def receive_and_play(self):
         # Clear the audiobuffer when receiving a new stream.
-        self.audiobuffer = []
+        self.audiobuffer = b''
         audioChunkSize = self.params[0] * self.params[1] * self.n_frames
         stream = self.p.open(format=self.p.get_format_from_width(self.params[1]),
                              channels=self.params[0], rate=self.params[2],
                              frames_per_buffer=2048,
                              output=True)
-        #data, server = self.client_sockets[self.countConnections].recvfrom(audioChunkSize)
-        #self.audiobuffer.append(data)
-        packetCount = 1
-        print(audioChunkSize)
-        #print(len(data))
-        # Receive data from audiostreamers.
-        #while data != b'':
+        packetCount = 0
+        # Receive data from audiostreamers...
         while True:
             try:
-                #if len(data) == audioChunkSize:
-                data, server = self.client_sockets[self.countConnections].recvfrom(audioChunkSize)
+                # Receive the data in chunks.
+                data = self.client_sockets[self.countConnections].recv(audioChunkSize)
+                # ...until there is no more data to receive.
                 if data == b'':
+                    print('Received {:d} packets from address {:s}.'.format(packetCount,
+                                                                            self.address[self.countConnections][0]))
                     break
+                # Play the received data.
                 stream.write(data, self.n_frames)
-                self.audiobuffer.append(data)
+                self.audiobuffer += data
                 packetCount += 1
-                #print('received data length: ', len(data), packetCount)
-                #with threading.Lock():
             except OSError as e:
                 print(e.strerror)
                 break
-        #print(self.client_socket)
-        print(len(self.audiobuffer))
-        #print(self.audiobuffer[-1:])
         self.client_sockets[self.countConnections].close()
 
     def write_wav(self, filename):
         wav_out = wave.open(filename, 'wb')
         wav_out.setparams(self.params)
-        wav_out.writeframes(b''.join(self.audiobuffer))
+        wav_out.writeframes(self.audiobuffer)
 
 
 if __name__ == '__main__':
-    port = 6000
+    # Read port from command line.
+    port = int(sys.argv[1])
+    try:
+        dir_out = sys.argv[2]
+    except IndexError:
+        dir_out = ''
+        print('No output directory specified. Writing file to current folder.')
 
     recorder = AudioRecorder(port)
     # Listen for new input until program is stopped.
@@ -92,6 +97,7 @@ if __name__ == '__main__':
     while True:
         recorder.accept_connection()
         recorder.receive_params()
+        time.sleep(0.1)  # Something is not blocking correctly. This sleep fixes it...
         recorder.receive_and_play()
-        file_out = 'wav/Secretariat_Homebound/output-' + str(recorder.countConnections) + '.wav'
+        file_out = dir_out + 'output-' + str(recorder.countConnections) + '.wav'
         recorder.write_wav(file_out)
