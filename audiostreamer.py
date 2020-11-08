@@ -1,3 +1,7 @@
+# A module for streaming .wav files.
+# Usage: python audiostreamer.py filename host:port
+
+import sys
 import wave
 import socket
 import pickle
@@ -15,8 +19,13 @@ class AudioStreamer:
         else:
             self.n_frames = 1024
         if address is not None:
-            self.hostname, self.port = address.split(':')
-            self.port = int(self.port)
+            try:
+                self.hostname, self.port = address.split(':')
+                self.port = int(self.port)
+            except ValueError:
+                print('No port given. Defaulting to port 6000.')
+                self.hostname = address
+                self.port = 6000
         else:
             self.hostname = 'localhost'
             self.port = 6000
@@ -25,7 +34,7 @@ class AudioStreamer:
         self.client_socket.connect((self.hostname, self.port))
         # Send data
         self.send_params()
-        time.sleep(0.1)  # Something is not blocking correctly. This sleep fixes it.
+        time.sleep(0.1)  # Something is not blocking correctly. This sleep fixes it...
         self.send_data()
 
     def send_params(self):
@@ -35,18 +44,16 @@ class AudioStreamer:
 
     def send_data(self):
         data = self.wav.readframes(self.n_frames)
-        print(len(data))
         while data != b'':
             self.client_socket.send(data)
             data = self.wav.readframes(self.n_frames)
 
 
 if __name__ == '__main__':
-    #filename = 'wav/AnnaBlanton_Rachel_Full/06_Violin.wav'
-    filename = 'wav/Secretariat_Homebound/01_VoxBanjo.wav'
-    #filename = 'wav/Secretariat_Homebound/02_VoxGuitar.wav'
-
+    # Read filename and host from command line.
+    # Filename includes path relative to run directory.
+    filename = sys.argv[1]
+    # Host is in the format address:port.
+    host = sys.argv[2]
     # Initialize AudioStreamer
-    #host = "192.168.1.88:6000"
-    host = "62.249.189.110:6000"
     streamer = AudioStreamer(filename, host)
